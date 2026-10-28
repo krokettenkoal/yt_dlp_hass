@@ -26,6 +26,7 @@ from .helpers import check_download_dir
 
 _LOGGER = logging.getLogger(__name__)
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS = [Platform.SENSOR]
 OUTPUT_TEMPLATE = "%(title)s [%(id)s].%(ext)s"
 TEMP_SUBDIR = ".yt_dlp_tmp"
