@@ -26,7 +26,7 @@ Category: Integration
 - Add the integration labeled "Youtube-DLP".
 - Enter the absolute path of the download folder.
 
-The folder must be inside your config directory or listed in `allowlist_external_dirs` in `configuration.yaml`:
+The folder must be inside an allowed directory (by default, Home Assistant's `www` and media directories), or explicitly listed in `allowlist_external_dirs` in `configuration.yaml`:
 
 ```yaml
 homeassistant:
