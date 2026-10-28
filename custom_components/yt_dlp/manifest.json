@@ -8,7 +8,7 @@
     "iot_class": "calculated",
     "issue_tracker": "https://github.com/krokettenkoal/yt_dlp_hass/issues",
     "loggers": ["yt_dlp"],
-    "requirements": ["yt-dlp==2026.07.04"],
+    "requirements": ["yt-dlp>=2026.07.04"],
     "single_config_entry": true,
     "version": "0.2.0"
 }
