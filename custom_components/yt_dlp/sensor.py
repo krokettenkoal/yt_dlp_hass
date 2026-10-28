@@ -29,6 +29,7 @@ class DownloadsSensor(SensorEntity):
 
     def __init__(self, entry: YtDlpConfigEntry) -> None:
         self._entry_id = entry.entry_id
+        self._generation = entry.runtime_data.generation
         self._attr_unique_id = entry.entry_id
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
@@ -40,7 +41,9 @@ class DownloadsSensor(SensorEntity):
     async def async_added_to_hass(self) -> None:
         self.async_on_remove(
             async_dispatcher_connect(
-                self.hass, progress_signal(self._entry_id), self._async_on_progress
+                self.hass,
+                progress_signal(self._entry_id, self._generation),
+                self._async_on_progress,
             )
         )
 
@@ -59,6 +62,8 @@ class DownloadsSensor(SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, dict[str, Any]]:
         return {
-            stream["name"]: {k: v for k, v in stream.items() if k != "name"}
-            for stream in self._streams.values()
+            f"{stream['name']} ({key})": {
+                k: v for k, v in stream.items() if k != "name"
+            }
+            for key, stream in self._streams.items()
         }

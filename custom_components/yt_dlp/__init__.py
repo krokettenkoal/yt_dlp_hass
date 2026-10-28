@@ -1,9 +1,12 @@
 """The yt_dlp integration."""
 
+import asyncio
 import logging
 import os
+import threading
 from dataclasses import dataclass
 from typing import Any
+from uuid import uuid4
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
@@ -45,6 +48,9 @@ SERVICE_SCHEMA = vol.Schema(
 @dataclass
 class YtDlpData:
     download_dir: str
+    generation: str
+    workers: dict[asyncio.Future[None], threading.Event]
+    unloading: bool = False
 
 
 YtDlpConfigEntry = ConfigEntry[YtDlpData]
@@ -66,8 +72,17 @@ class _YtDlpLogger:
         _LOGGER.error(msg)
 
 
-def _make_progress_hook(hass: HomeAssistant, entry_id: str):
-    signal = progress_signal(entry_id)
+class _DownloadCancelled(Exception):
+    """Raised by a progress hook when its entry is unloading."""
+
+
+def _make_progress_hook(
+    hass: HomeAssistant,
+    signal: str,
+    job_id: str,
+    cancel_event: threading.Event,
+    stream_keys: set[str],
+):
 
     @callback
     def _dispatch(key: str, values: dict[str, Any] | None) -> None:
@@ -75,8 +90,11 @@ def _make_progress_hook(hass: HomeAssistant, entry_id: str):
 
     def progress_hook(d: dict[str, Any]) -> None:
         # Runs on yt-dlp's executor thread; only copy plain values here.
+        if cancel_event.is_set():
+            raise _DownloadCancelled
         info = d.get("info_dict") or {}
-        key = f"{info.get('id')}:{info.get('format_id')}"
+        key = f"{job_id}:{info.get('id')}:{info.get('format_id')}"
+        stream_keys.add(key)
         values = None
         if d.get("status") == "downloading":
             values = {
@@ -91,15 +109,40 @@ def _make_progress_hook(hass: HomeAssistant, entry_id: str):
     return progress_hook
 
 
-def _run_yt_dlp(url: str, ydl_opts: dict[str, Any]) -> None:
-    with YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+def _run_yt_dlp(
+    hass: HomeAssistant,
+    signal: str,
+    url: str,
+    ydl_opts: dict[str, Any],
+    cancel_event: threading.Event,
+    stream_keys: set[str],
+) -> None:
+    try:
+        if cancel_event.is_set():
+            raise _DownloadCancelled
+        with YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+    finally:
+        for key in stream_keys:
+            hass.loop.call_soon_threadsafe(
+                async_dispatcher_send, hass, signal, key, None
+            )
 
 
 async def _async_download(
-    hass: HomeAssistant, entry: YtDlpConfigEntry, url: str, options: dict[str, Any]
+    hass: HomeAssistant,
+    entry: YtDlpConfigEntry,
+    data: YtDlpData,
+    url: str,
+    options: dict[str, Any],
 ) -> None:
-    download_dir = entry.runtime_data.download_dir
+    if data.unloading:
+        return
+    download_dir = data.download_dir
+    job_id = uuid4().hex
+    signal = progress_signal(entry.entry_id, data.generation)
+    cancel_event = threading.Event()
+    stream_keys: set[str] = set()
     ydl_opts = {
         **options,
         "paths": {
@@ -107,14 +150,26 @@ async def _async_download(
             "temp": os.path.join(download_dir, TEMP_SUBDIR),
         },
         "outtmpl": OUTPUT_TEMPLATE,
-        "progress_hooks": [_make_progress_hook(hass, entry.entry_id)],
+        "progress_hooks": [
+            _make_progress_hook(hass, signal, job_id, cancel_event, stream_keys)
+        ],
         "logger": _YtDlpLogger(),
         "quiet": True,
         "noprogress": True,
         "ignoreerrors": False,
     }
+    worker = hass.async_add_executor_job(
+        _run_yt_dlp, hass, signal, url, ydl_opts, cancel_event, stream_keys
+    )
+    data.workers[worker] = cancel_event
+    worker.add_done_callback(lambda future: data.workers.pop(future, None))
     try:
-        await hass.async_add_executor_job(_run_yt_dlp, url, ydl_opts)
+        await asyncio.shield(worker)
+    except asyncio.CancelledError:
+        cancel_event.set()
+        raise
+    except _DownloadCancelled:
+        pass
     except DownloadError as err:
         _LOGGER.error("Download failed for %s: %s", url, err)
     else:
@@ -128,11 +183,14 @@ async def _async_handle_download(call: ServiceCall) -> None:
     if not entries:
         raise ServiceValidationError("The Youtube-DLP integration is not set up")
     entry = entries[0]
+    data = entry.runtime_data
+    if data.unloading:
+        raise ServiceValidationError("The Youtube-DLP integration is unloading")
     url = call.data["url"]
     options = {key: value for key, value in call.data.items() if key != "url"}
     entry.async_create_background_task(
         call.hass,
-        _async_download(call.hass, entry, url, options),
+        _async_download(call.hass, entry, data, url, options),
         name=f"{DOMAIN} download {url}",
     )
 
@@ -154,11 +212,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: YtDlpConfigEntry) -> boo
     if error:
         raise ConfigEntryNotReady(f"Download folder {download_dir} is not writable")
 
-    entry.runtime_data = YtDlpData(download_dir=download_dir)
+    entry.runtime_data = YtDlpData(
+        download_dir=download_dir,
+        generation=uuid4().hex,
+        workers={},
+    )
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: YtDlpConfigEntry) -> bool:
     """Unload the progress sensor."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    data = entry.runtime_data
+    data.unloading = True
+    workers = tuple(data.workers.items())
+    for _, cancel_event in workers:
+        cancel_event.set()
+    if workers:
+        await asyncio.gather(
+            *(asyncio.shield(worker) for worker, _ in workers),
+            return_exceptions=True,
+        )
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if not unloaded:
+        data.unloading = False
+    return unloaded
