@@ -1,6 +1,6 @@
 # Integration to use YT-DLP within Home Assistant
 
-Integration can be used with [`yt_dlp-card`](https://github.com/ybk5053/yt_dlp-card) to see download status
+Downloads videos with [yt-dlp](https://github.com/yt-dlp/yt-dlp) into a folder on your Home Assistant host and reports active downloads through a sensor.
 
 ## Installation
 
@@ -15,24 +15,46 @@ Clone or download this repository and copy the "yt_dlp" directory to your "custo
 - Add Custom Repositories
 
 ```text
-Repository: https://github.com/ybk5053/yt_dlp_hass
+Repository: https://github.com/krokettenkoal/yt_dlp_hass
 Category: Integration
 ```
 
 ## Configuration
 
-### Configuration via the "Configuration -> Integrations" section of the Home Assistant UI
+### Configuration via the "Settings -> Devices & services" section of the Home Assistant UI
 
-- Search for the integration labeled "Youtube DLP" and select it.  
-- Enter the path for the download directory.
+- Add the integration labeled "Youtube-DLP".
+- Enter the absolute path of the download folder.
+
+The folder must be inside your config directory or listed in `allowlist_external_dirs` in `configuration.yaml`:
+
+```yaml
+homeassistant:
+  allowlist_external_dirs:
+    - /media/youtube
+```
+
+The folder is created if it does not exist. To change it later, use the integration's "Reconfigure" option.
 
 ## Downloading
 
-### Via Developer tools -> Services
+### Via Developer tools -> Actions
 
-- Search for service "yt_dlp.download"
-- Enter link to video download and click "call service"
-- Additional options can be passed into the data in Yaml Mode
-- See [`yt_dlp/YoutubeDL.py`](https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/YoutubeDL.py) or `help(yt_dlp.YoutubeDL)` in a Python shell for list of options
+- Search for the action "Download video" (`yt_dlp.download`).
+- Enter the URL of the video to download and call the action.
+- Downloads run in the background; check the progress sensor or the Home Assistant log for the result.
 
-### Via [`yt_dlp-card`](https://github.com/ybk5053/yt_dlp-card)
+The action accepts these optional fields. Any other field is rejected.
+
+| Field | Description |
+| --- | --- |
+| `format` | yt-dlp format selector, for example `bv*+ba/b` |
+| `merge_output_format` | Container used when merging streams, for example `mp4` or `mkv` |
+| `noplaylist` | Download only the video when the URL points to a video inside a playlist |
+| `playlist_items` | Items to download from a playlist, for example `1-5,8` |
+
+Files are saved in the download folder as `<title> [<id>].<ext>`. Output templates and post-processing commands are not accepted.
+
+### Progress sensor
+
+The sensor `sensor.youtube_dlp_downloads` shows the number of active downloads. Its attributes list each active file with `speed`, `downloaded`, `total`, and `eta`.
