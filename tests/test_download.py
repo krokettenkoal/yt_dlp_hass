@@ -6,8 +6,9 @@ from unittest.mock import patch
 
 import pytest
 import voluptuous as vol
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from yt_dlp.utils import DownloadError
+from yt_dlp.utils import DownloadError, sanitize_filename
 
 from custom_components.yt_dlp import (
     OUTPUT_TEMPLATE,
@@ -15,7 +16,7 @@ from custom_components.yt_dlp import (
     _DownloadCancelled,
     _make_progress_hook,
 )
-from custom_components.yt_dlp.const import DOMAIN, progress_signal
+from custom_components.yt_dlp.const import DEFAULT_OPTIONS, DOMAIN, progress_signal
 
 SERVICE = "download"
 URL = "https://www.youtube.com/watch?v=abc"
@@ -307,3 +308,60 @@ async def test_unload_cancels_worker_and_isolates_generation(
         {"name": "stale.mp4", "downloaded": 1},
     )
     assert hass.states.get(SENSOR).state == "0"
+
+
+async def test_defaults_apply_without_saved_options(hass, mock_entry, mock_ydl):
+    await _setup(hass, mock_entry)
+    await _download(hass, {})
+
+    opts = mock_ydl.call_args.args[0]
+    assert opts["restrictfilenames"] is True
+    assert opts["format"] == "bv*+ba/b"
+    assert opts["merge_output_format"] == "mkv"
+    assert opts["concurrent_fragment_downloads"] == 1
+    assert opts["retries"] == 10
+    assert opts["outtmpl"] == OUTPUT_TEMPLATE
+
+
+async def test_saved_options_apply_without_reload(hass, mock_entry, mock_ydl):
+    await _setup(hass, mock_entry)
+    hass.config_entries.async_update_entry(
+        mock_entry,
+        options={
+            **DEFAULT_OPTIONS,
+            "format": "ba/b",
+            "concurrent_fragment_downloads": 4.0,
+        },
+    )
+    await _download(hass, {})
+
+    opts = mock_ydl.call_args.args[0]
+    assert opts["format"] == "ba/b"
+    assert opts["concurrent_fragment_downloads"] == 4
+    assert mock_entry.state is ConfigEntryState.LOADED
+
+
+async def test_service_call_overrides_saved_options(hass, mock_entry, mock_ydl):
+    await _setup(hass, mock_entry)
+    hass.config_entries.async_update_entry(
+        mock_entry, options={**DEFAULT_OPTIONS, "format": "ba/b"}
+    )
+    await _download(hass, {"format": "bv*+ba/b", "retries": 2})
+
+    opts = mock_ydl.call_args.args[0]
+    assert opts["format"] == "bv*+ba/b"
+    assert opts["retries"] == 2
+
+
+@pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        ('Dogs "and" cats', "Dogs_and_cats"),
+        ("Hello – World", "Hello_World"),
+        ("Hello — World", "Hello_World"),
+        ("Café Ünïcode", "Cafe_Unicode"),
+        ("Rock & Roll; part_2 - final", "Rock_Roll_part_2_-_final"),
+    ],
+)
+def test_restricted_filenames_remove_special_characters(title, expected):
+    assert sanitize_filename(title, restricted=True) == expected

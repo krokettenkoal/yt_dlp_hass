@@ -84,3 +84,32 @@ async def test_reconfigure_updates_path_and_reloads(
     assert mock_entry.runtime_data.download_dir == str(new_dir)
     assert new_dir.is_dir()
     assert mock_entry.state is ConfigEntryState.LOADED
+
+
+async def test_options_flow_saves_defaults(hass, mock_entry):
+    await hass.config_entries.async_setup(mock_entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(mock_entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "init"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            "restrictfilenames": False,
+            "format": "ba/b",
+            "merge_output_format": "mp4",
+            "noplaylist": True,
+            "writesubtitles": True,
+            "subtitleslangs": ["de"],
+            "writethumbnail": True,
+            "writeinfojson": False,
+            "concurrent_fragment_downloads": 4,
+            "retries": 3,
+        },
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert mock_entry.options["format"] == "ba/b"
+    assert mock_entry.options["subtitleslangs"] == ["de"]
+    assert mock_entry.state is ConfigEntryState.LOADED

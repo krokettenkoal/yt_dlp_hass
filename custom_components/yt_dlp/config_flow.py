@@ -6,9 +6,18 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_FILE_PATH
+from homeassistant.core import callback
+from homeassistant.helpers import selector
 
-from .const import DOMAIN
+from .const import DEFAULT_OPTIONS, DOMAIN
 from .helpers import check_download_dir
+
+FORMAT_PRESETS = [
+    {"value": "bv*+ba/b", "label": "Best quality"},
+    {"value": "bv*[height<=1080]+ba/b[height<=1080]", "label": "Up to 1080p"},
+    {"value": "bv*[height<=720]+ba/b[height<=720]", "label": "Up to 720p"},
+    {"value": "ba/b", "label": "Audio only"},
+]
 
 
 def _path_schema(suggested: str | None = None) -> vol.Schema:
@@ -19,10 +28,54 @@ def _path_schema(suggested: str | None = None) -> vol.Schema:
     return vol.Schema({key: str})
 
 
+def _options_schema() -> vol.Schema:
+    return vol.Schema(
+        {
+            vol.Required("restrictfilenames"): selector.BooleanSelector(),
+            vol.Required("format"): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=FORMAT_PRESETS, custom_value=True)
+            ),
+            vol.Required("merge_output_format"): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=["mkv", "mp4", "webm"], custom_value=True
+                )
+            ),
+            vol.Required("noplaylist"): selector.BooleanSelector(),
+            vol.Required("writesubtitles"): selector.BooleanSelector(),
+            vol.Required("subtitleslangs"): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=["en", "de", "fr", "es", "ja"],
+                    multiple=True,
+                    custom_value=True,
+                )
+            ),
+            vol.Required("writethumbnail"): selector.BooleanSelector(),
+            vol.Required("writeinfojson"): selector.BooleanSelector(),
+            vol.Required("concurrent_fragment_downloads"): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=1, max=16, step=1, mode=selector.NumberSelectorMode.BOX
+                )
+            ),
+            vol.Required("retries"): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0, max=50, step=1, mode=selector.NumberSelectorMode.BOX
+                )
+            ),
+        }
+    )
+
+
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Config flow."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> config_entries.OptionsFlow:
+        return OptionsFlowHandler()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -64,4 +117,21 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="reconfigure",
             data_schema=_path_schema(current),
             errors=errors,
+        )
+
+
+class OptionsFlowHandler(config_entries.OptionsFlow):
+    """Default download options. Changes apply to the next download."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(
+                _options_schema(), {**DEFAULT_OPTIONS, **self.config_entry.options}
+            ),
         )
