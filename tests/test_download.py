@@ -100,6 +100,7 @@ async def test_download_passes_allowed_options(
     assert opts["noplaylist"] is True
     assert opts["playlist_items"] == "1-3,5"
     assert opts["paths"]["home"] == str(download_dir)
+    assert opts["paths"]["temp"] == mock_entry.runtime_data.temp_dir
     assert opts["outtmpl"] == OUTPUT_TEMPLATE
     assert opts["ignoreerrors"] is False
     mock_ydl.return_value.__enter__.return_value.download.assert_called_once_with([URL])
