@@ -29,5 +29,34 @@
         "name": "Downloads"
       }
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Download options",
+        "description": "Defaults for every download. A download service call can override any of these.",
+        "data": {
+          "restrictfilenames": "Restrict filenames",
+          "format": "Format",
+          "merge_output_format": "Merge output format",
+          "noplaylist": "Only this video",
+          "writesubtitles": "Download subtitles",
+          "subtitleslangs": "Subtitle languages",
+          "writethumbnail": "Save thumbnail",
+          "writeinfojson": "Save video info",
+          "concurrent_fragment_downloads": "Concurrent fragments",
+          "retries": "Retries"
+        },
+        "data_description": {
+          "restrictfilenames": "Replace spaces with underscores and remove quotes, dashes and other special characters. Accents are converted to plain letters.",
+          "format": "Video quality. Pick a preset or enter a yt-dlp format string.",
+          "merge_output_format": "Container used when merging video and audio streams.",
+          "noplaylist": "If the URL points to a video inside a playlist, download only that video.",
+          "subtitleslangs": "Language codes of the subtitles to download, for example en or de.",
+          "concurrent_fragment_downloads": "Number of fragments downloaded at the same time.",
+          "retries": "Number of times a failed download is retried."
+        }
+      }
+    }
   }
 }

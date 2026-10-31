@@ -25,14 +25,20 @@ from homeassistant.helpers.typing import ConfigType
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 
-from .const import ALLOWED_OPTIONS, DOMAIN, SERVICE_DOWNLOAD, progress_signal
+from .const import (
+    ALLOWED_OPTIONS,
+    DEFAULT_OPTIONS,
+    DOMAIN,
+    SERVICE_DOWNLOAD,
+    progress_signal,
+)
 from .helpers import check_download_dir, ensure_dir
 
 _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS = [Platform.SENSOR]
-OUTPUT_TEMPLATE = "%(title)s [%(id)s].%(ext)s"
+OUTPUT_TEMPLATE = "%(title)s_%(id)s.%(ext)s"
 
 SERVICE_SCHEMA = vol.Schema(
     {
@@ -189,7 +195,11 @@ async def _async_handle_download(call: ServiceCall) -> None:
     if data.unloading:
         raise ServiceValidationError("The Youtube-DLP integration is unloading")
     url = call.data["url"]
-    options = {key: value for key, value in call.data.items() if key != "url"}
+    overrides = {key: value for key, value in call.data.items() if key != "url"}
+    options = {
+        key: ALLOWED_OPTIONS[key](value)
+        for key, value in {**DEFAULT_OPTIONS, **entry.options, **overrides}.items()
+    }
     entry.async_create_background_task(
         call.hass,
         _async_download(call.hass, entry, data, url, options),
