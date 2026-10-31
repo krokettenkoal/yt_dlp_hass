@@ -11,7 +11,7 @@ download:
         text:
     restrictfilenames:
       name: Restrict filenames
-      description: Replace spaces with underscores and remove quotes, dashes and other special characters from the file name
+      description: Replace spaces with underscores and remove quotes and other special characters from the file name
       selector:
         boolean:
     format:

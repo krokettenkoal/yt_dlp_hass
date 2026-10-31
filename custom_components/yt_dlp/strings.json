@@ -48,7 +48,7 @@
           "retries": "Retries"
         },
         "data_description": {
-          "restrictfilenames": "Replace spaces with underscores and remove quotes, dashes and other special characters. Accents are converted to plain letters.",
+          "restrictfilenames": "Replace spaces with underscores and remove quotes and other special characters. Accents are converted to plain letters.",
           "format": "Video quality. Pick a preset or enter a yt-dlp format string.",
           "merge_output_format": "Container used when merging video and audio streams.",
           "noplaylist": "If the URL points to a video inside a playlist, download only that video.",

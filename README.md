@@ -105,24 +105,26 @@ data:
 
 Set defaults under **Settings → Devices & services → yt-dlp Video Downloader → Configure**. Each option can also be set in a `yt_dlp.download` call. Changes apply to the next download, and running downloads are not affected.
 
+The option names are the same as yt-dlp's own parameter names, and each link goes to the matching section of the [yt-dlp documentation](https://github.com/yt-dlp/yt-dlp#readme) for the full details and accepted values.
+
 | Option | Default | Description |
 | --- | --- | --- |
-| `restrictfilenames` | on | Replace spaces with underscores and remove quotes, dashes and other special characters. Accents become plain letters. |
-| `format` | `bv*+ba/b` (best quality) | yt-dlp format selector. Presets for best, 1080p, 720p and audio-only are offered, or enter your own. |
-| `merge_output_format` | `mkv` | Container used when merging video and audio, for example `mp4` or `mkv`. |
-| `noplaylist` | off | If the URL points to a video inside a playlist, download only that video. |
-| `playlist_items` | (none) | Items to download from a playlist, for example `1-5,8`. Service call only. |
-| `writesubtitles` | off | Save subtitles as separate files. |
-| `subtitleslangs` | `en` | Subtitle languages, for example `en` or `de`. |
-| `writethumbnail` | off | Save the thumbnail as a separate image file. |
-| `writeinfojson` | off | Save the video metadata as a separate `.info.json` file. |
-| `concurrent_fragment_downloads` | 1 | Fragments downloaded at the same time (1–16). |
-| `retries` | 10 | Retries for a failed download (0–50). |
+| [`restrictfilenames`](https://github.com/yt-dlp/yt-dlp#filesystem-options) | on | Replace spaces with underscores and remove quotes and other special characters. Accents become plain letters. |
+| [`format`](https://github.com/yt-dlp/yt-dlp#format-selection) | `bv*+ba/b` (best quality) | Format selector, passed to yt-dlp unchanged. Presets for best, 1080p, 720p and audio-only are offered, or enter your own. |
+| [`merge_output_format`](https://github.com/yt-dlp/yt-dlp#video-format-options) | `mkv` | Container used when merging video and audio, for example `mp4` or `mkv`. |
+| [`noplaylist`](https://github.com/yt-dlp/yt-dlp#video-selection) | off | If the URL points to a video inside a playlist, download only that video. |
+| [`playlist_items`](https://github.com/yt-dlp/yt-dlp#video-selection) | (none) | Items to download from a playlist, for example `1-5,8`. Service call only. |
+| [`writesubtitles`](https://github.com/yt-dlp/yt-dlp#subtitle-options) | off | Save subtitles as separate files. |
+| [`subtitleslangs`](https://github.com/yt-dlp/yt-dlp#subtitle-options) | `en` | Subtitle languages, for example `en` or `de`. |
+| [`writethumbnail`](https://github.com/yt-dlp/yt-dlp#thumbnail-options) | off | Save the thumbnail as a separate image file. |
+| [`writeinfojson`](https://github.com/yt-dlp/yt-dlp#filesystem-options) | off | Save the video metadata as a separate `.info.json` file. |
+| [`concurrent_fragment_downloads`](https://github.com/yt-dlp/yt-dlp#download-options) | 1 | Fragments downloaded at the same time (1–16). |
+| [`retries`](https://github.com/yt-dlp/yt-dlp#download-options) | 10 | Retries for a failed download (0–50). |
 
 Files are saved in the download folder as `<title>_<id>.<ext>`, for example `My_Video_abc123.mp4`.
 
 > [!TIP]
-> Keep **Restrict filenames** on. It removes quotes and en/em dashes from titles, so file names work everywhere, including SMB shares.
+> Keep **Restrict filenames** on. It removes quotes and other special characters from titles, so file names work on every system, including network shares.
 
 > [!WARNING]
 > A title with no Latin letters, such as a Japanese title, becomes an underscore, so the file is named `__<id>.<ext>`. Options that run post-processing commands or change the output template are not available.
@@ -138,28 +140,43 @@ The sensor `sensor.yt_dlp_video_downloader_downloads` shows how many downloads a
 
 The sensor is part of the **yt-dlp Video Downloader** device.
 
-> [!NOTE]
-> Installations set up before the rename keep the old entity ID `sensor.youtube_dlp_downloads`, because Home Assistant keeps the ID of existing entities. To use the new ID, rename the entity under **Settings → Entities**.
+If your sensor has a different entity ID, search for it under **Settings → Entities**.
 
 ## Troubleshooting
 
-**The download folder is not writable or not allowed.**
-Check that the folder is absolute and inside your config directory or `allowlist_external_dirs`. Check the permissions of the folder for the user that runs Home Assistant.
+### "Path must be absolute and inside an allowed directory"
 
-**Partial files are left in a folder, or a file cannot be deleted.**
-A download that was interrupted can leave a partial file behind. If a file is locked, it's usually still open by a running download. Restart Home Assistant, then try again.
+The download folder is outside your config directory and not allowed by Home Assistant.
 
-> [!CAUTION]
-> Avoid deleting files with `sudo` while a download is running. The file may still be in use, and the deletion can hide the real cause.
+1. Enter an absolute path, for example `/media/youtube`.
+2. Add the folder to `allowlist_external_dirs` (see [Configuration](#configuration)).
+3. Restart Home Assistant.
 
-**Check the log.**
-Errors from yt-dlp appear in the Home Assistant log under the `custom_components.yt_dlp` logger. For more detail, add this to `configuration.yaml` and restart:
+### "Cannot create the folder or it is not writable"
 
-```yaml
-logger:
-  logs:
-    custom_components.yt_dlp: debug
-```
+Home Assistant cannot create the folder or write to it.
+
+1. Check that the parent folder exists and is writable.
+2. Check the permissions for the user that runs Home Assistant. In Docker, also check the volume mount and the user inside the container.
+
+### Partial files remain, or a file cannot be deleted
+
+An interrupted download, or one still running, can keep its file open.
+
+1. Wait until the [progress sensor](#progress-sensor) shows `0`.
+2. Restart Home Assistant to release any open file handles.
+3. Delete the file again.
+
+### A download fails or produces no file
+
+1. Check the Home Assistant log for `Download failed`.
+2. For more detail, enable debug logging in `configuration.yaml` and restart:
+
+   ```yaml
+   logger:
+     logs:
+       custom_components.yt_dlp: debug
+   ```
 
 ## License
 
