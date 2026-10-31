@@ -14,7 +14,7 @@ async def test_setup_and_unload(hass, mock_entry):
     await hass.config_entries.async_setup(mock_entry.entry_id)
     await hass.async_block_till_done()
     assert mock_entry.state is ConfigEntryState.LOADED
-    assert hass.states.get("sensor.youtube_dlp_downloads") is not None
+    assert hass.states.get("sensor.yt_dlp_video_downloader_downloads") is not None
     assert Path(mock_entry.runtime_data.temp_dir).is_dir()
     assert (
         Path(mock_entry.runtime_data.temp_dir) == Path(tempfile.gettempdir()) / DOMAIN

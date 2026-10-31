@@ -189,11 +189,11 @@ async def _async_handle_download(call: ServiceCall) -> None:
         DOMAIN
     )
     if not entries:
-        raise ServiceValidationError("The Youtube-DLP integration is not set up")
+        raise ServiceValidationError("The yt-dlp Video Downloader is not set up")
     entry = entries[0]
     data = entry.runtime_data
     if data.unloading:
-        raise ServiceValidationError("The Youtube-DLP integration is unloading")
+        raise ServiceValidationError("The yt-dlp Video Downloader is unloading")
     url = call.data["url"]
     overrides = {key: value for key, value in call.data.items() if key != "url"}
     options = {

@@ -1,6 +1,6 @@
 {
     "domain": "yt_dlp",
-    "name": "Youtube-DLP",
+    "name": "yt-dlp Video Downloader",
     "codeowners": ["@krokettenkoal"],
     "config_flow": true,
     "documentation": "https://github.com/krokettenkoal/yt_dlp_hass",
