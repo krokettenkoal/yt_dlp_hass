@@ -20,7 +20,7 @@ from custom_components.yt_dlp.const import DEFAULT_OPTIONS, DOMAIN, progress_sig
 
 SERVICE = "download"
 URL = "https://www.youtube.com/watch?v=abc"
-SENSOR = "sensor.youtube_dlp_downloads"
+SENSOR = "sensor.yt_dlp_video_downloader_downloads"
 STREAM_FILE = "/downloads/Title [abc].f137.mp4"
 STREAM_INFO = {"id": "abc", "format_id": "137"}
 

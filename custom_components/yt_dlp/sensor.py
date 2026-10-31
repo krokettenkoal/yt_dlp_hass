@@ -33,7 +33,7 @@ class DownloadsSensor(SensorEntity):
         self._attr_unique_id = entry.entry_id
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
-            name="Youtube-DLP",
+            name="yt-dlp Video Downloader",
             entry_type=DeviceEntryType.SERVICE,
         )
         self._streams: dict[str, dict[str, Any]] = {}

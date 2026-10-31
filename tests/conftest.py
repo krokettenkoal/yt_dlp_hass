@@ -25,7 +25,7 @@ def download_dir(hass: HomeAssistant, tmp_path):
 def mock_entry(hass: HomeAssistant, download_dir) -> MockConfigEntry:
     entry = MockConfigEntry(
         domain=DOMAIN,
-        title="Youtube-DLP",
+        title="yt-dlp Video Downloader",
         data={CONF_FILE_PATH: str(download_dir)},
         unique_id=DOMAIN,
     )

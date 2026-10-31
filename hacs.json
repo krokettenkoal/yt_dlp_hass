@@ -1,5 +1,4 @@
 {
-    "name": "Youtube DLP",
-    "render_readme": true,
+    "name": "yt-dlp Video Downloader",
     "homeassistant": "2026.1.0"
 }

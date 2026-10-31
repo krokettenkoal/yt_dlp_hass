@@ -88,7 +88,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 check_download_dir, self.hass, user_input[CONF_FILE_PATH]
             )
             if error is None:
-                return self.async_create_entry(title="Youtube-DLP", data=user_input)
+                return self.async_create_entry(
+                    title="yt-dlp Video Downloader", data=user_input
+                )
             errors["base"] = error
 
         return self.async_show_form(
