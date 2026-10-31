@@ -6,6 +6,10 @@ from pathlib import Path
 from homeassistant.core import HomeAssistant
 
 
+def ensure_dir(path: str) -> None:
+    Path(path).mkdir(parents=True, exist_ok=True)
+
+
 def check_download_dir(hass: HomeAssistant, path: str) -> str | None:
     """Create the download folder if needed; return an error key on failure."""
     if not Path(path).is_absolute() or not hass.config.is_allowed_path(path):

@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import os
+import tempfile
 import threading
 from dataclasses import dataclass
 from typing import Any
@@ -25,14 +26,13 @@ from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 
 from .const import ALLOWED_OPTIONS, DOMAIN, SERVICE_DOWNLOAD, progress_signal
-from .helpers import check_download_dir
+from .helpers import check_download_dir, ensure_dir
 
 _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS = [Platform.SENSOR]
 OUTPUT_TEMPLATE = "%(title)s [%(id)s].%(ext)s"
-TEMP_SUBDIR = ".yt_dlp_tmp"
 
 SERVICE_SCHEMA = vol.Schema(
     {
@@ -48,6 +48,7 @@ SERVICE_SCHEMA = vol.Schema(
 @dataclass
 class YtDlpData:
     download_dir: str
+    temp_dir: str
     generation: str
     workers: dict[asyncio.Future[None], threading.Event]
     unloading: bool = False
@@ -148,7 +149,7 @@ async def _async_download(
         **options,
         "paths": {
             "home": download_dir,
-            "temp": os.path.join(download_dir, TEMP_SUBDIR),
+            "temp": data.temp_dir,
         },
         "outtmpl": OUTPUT_TEMPLATE,
         "progress_hooks": [
@@ -213,8 +214,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: YtDlpConfigEntry) -> boo
     if error:
         raise ConfigEntryNotReady(f"Download folder {download_dir} is not writable")
 
+    temp_dir = os.path.join(tempfile.gettempdir(), DOMAIN)
+    try:
+        await hass.async_add_executor_job(ensure_dir, temp_dir)
+    except OSError as err:
+        raise ConfigEntryNotReady(f"Temp folder {temp_dir} is not writable") from err
+
     entry.runtime_data = YtDlpData(
         download_dir=download_dir,
+        temp_dir=temp_dir,
         generation=uuid4().hex,
         workers={},
     )

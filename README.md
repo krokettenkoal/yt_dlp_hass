@@ -36,6 +36,8 @@ homeassistant:
 
 The folder is created if it does not exist. To change it later, use the integration's "Reconfigure" option.
 
+Partial downloads are kept in a `yt_dlp` folder in the system temporary directory until each download finishes. If the system clears that folder, for example on reboot, an interrupted download starts over.
+
 ## Downloading
 
 ### Via Developer tools -> Actions
