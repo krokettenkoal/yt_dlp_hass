@@ -12,6 +12,7 @@ from yt_dlp.utils import DownloadError
 from custom_components.yt_dlp import (
     OUTPUT_TEMPLATE,
     _async_download,
+    _DownloadCancelled,
     _make_progress_hook,
 )
 from custom_components.yt_dlp.const import DOMAIN, progress_signal
@@ -132,7 +133,7 @@ async def test_failed_download_cleans_up_progress(hass, mock_entry, mock_ydl):
 
     state = hass.states.get(SENSOR)
     assert state.state == "0"
-    assert not any(key.startswith("Title [abc].f137.mp4 (") for key in state.attributes)
+    assert "Title [abc].f137.mp4" not in state.attributes
 
 
 async def test_progress_hook_updates_sensor(hass, mock_entry):
@@ -159,10 +160,7 @@ async def test_progress_hook_updates_sensor(hass, mock_entry):
 
     state = hass.states.get(SENSOR)
     assert state.state == "1"
-    stream_key = next(
-        key for key in state.attributes if key.startswith("Title [abc].f137.mp4 (")
-    )
-    assert state.attributes[stream_key] == {
+    assert state.attributes["Title [abc].f137.mp4"] == {
         "downloaded": 50,
         "total": 100,
         "speed": 10.0,
@@ -185,7 +183,7 @@ async def test_finished_stream_is_removed(hass, mock_entry, mock_ydl):
 
     state = hass.states.get(SENSOR)
     assert state.state == "0"
-    assert not any(key.startswith("Title [abc].f137.mp4 (") for key in state.attributes)
+    assert "Title [abc].f137.mp4" not in state.attributes
 
 
 async def test_progress_hook_tolerates_missing_fields(hass, mock_entry):
@@ -202,10 +200,7 @@ async def test_progress_hook_tolerates_missing_fields(hass, mock_entry):
 
     state = hass.states.get(SENSOR)
     assert state.state == "1"
-    stream_key = next(
-        key for key in state.attributes if key.startswith("Title [abc].f137.mp4 (")
-    )
-    assert state.attributes[stream_key] == {
+    assert state.attributes["Title [abc].f137.mp4"] == {
         "downloaded": None,
         "total": None,
         "speed": None,
@@ -238,16 +233,7 @@ async def test_overlapping_downloads_have_distinct_streams(hass, mock_entry):
 
     state = hass.states.get(SENSOR)
     assert state.state == "2"
-    assert (
-        len(
-            [
-                key
-                for key in state.attributes
-                if key.startswith("Title [abc].f137.mp4 (")
-            ]
-        )
-        == 2
-    )
+    assert {"Title [abc].f137.mp4", "Title [abc].f137.mp4 (2)"} <= set(state.attributes)
     assert stream_keys[0].isdisjoint(stream_keys[1])
 
     hooks[0]({"status": "finished", "filename": STREAM_FILE, "info_dict": STREAM_INFO})
@@ -267,6 +253,7 @@ async def test_unload_cancels_worker_and_isolates_generation(
     old_generation = old_data.generation
     started = threading.Event()
     continue_download = threading.Event()
+    cancelled = threading.Event()
     finished = threading.Event()
 
     def download(urls):
@@ -288,6 +275,9 @@ async def test_unload_cancels_worker_and_isolates_generation(
                     "info_dict": STREAM_INFO,
                 }
             )
+        except _DownloadCancelled:
+            cancelled.set()
+            raise
         finally:
             finished.set()
 
@@ -296,9 +286,12 @@ async def test_unload_cancels_worker_and_isolates_generation(
     assert await hass.async_add_executor_job(started.wait, 1)
 
     unload = asyncio.create_task(hass.config_entries.async_unload(mock_entry.entry_id))
-    await asyncio.sleep(0)
+    async with asyncio.timeout(5):
+        while not old_data.unloading:
+            await asyncio.sleep(0)
     continue_download.set()
     assert await unload
+    assert cancelled.is_set()
     assert finished.is_set()
 
     await hass.config_entries.async_setup(mock_entry.entry_id)

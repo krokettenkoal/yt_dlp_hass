@@ -61,9 +61,12 @@ class DownloadsSensor(SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, dict[str, Any]]:
-        return {
-            f"{stream['name']} ({key})": {
-                k: v for k, v in stream.items() if k != "name"
-            }
-            for key, stream in self._streams.items()
-        }
+        attributes: dict[str, dict[str, Any]] = {}
+        for stream in self._streams.values():
+            name = stream["name"]
+            label, suffix = name, 2
+            while label in attributes:
+                label = f"{name} ({suffix})"
+                suffix += 1
+            attributes[label] = {k: v for k, v in stream.items() if k != "name"}
+        return attributes

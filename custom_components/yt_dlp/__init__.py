@@ -93,12 +93,13 @@ def _make_progress_hook(
         if cancel_event.is_set():
             raise _DownloadCancelled
         info = d.get("info_dict") or {}
-        key = f"{job_id}:{info.get('id')}:{info.get('format_id')}"
+        stream_id = f"{info.get('id')}:{info.get('format_id')}"
+        key = f"{job_id}:{stream_id}"
         stream_keys.add(key)
         values = None
         if d.get("status") == "downloading":
             values = {
-                "name": os.path.basename(d.get("filename") or key),
+                "name": os.path.basename(d.get("filename") or stream_id),
                 "speed": d.get("speed"),
                 "downloaded": d.get("downloaded_bytes"),
                 "total": d.get("total_bytes") or d.get("total_bytes_estimate"),
